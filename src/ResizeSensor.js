@@ -84,7 +84,7 @@
                 return;
             }
 
-            if ('onresize' in element) {
+            if ('onresize' in element && !(/Chrome/).test(navigator.userAgent)) {
                 //internet explorer
                 if (element.attachEvent) {
                     element.attachEvent('onresize', function() {
