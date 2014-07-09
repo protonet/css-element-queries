@@ -5,7 +5,7 @@
  */
 ;
 (function() {
-
+    var hasNativeResizeEvent = 'onresize' in document.createElement("span") && !(/Chrome/).test(navigator.userAgent);
     /**
      * Class for dimension change detection.
      *
@@ -47,6 +47,17 @@
                 this.q.push(ev);
             };
 
+            this.remove = function(ev) {
+              var index = this.q.indexOf(ev);
+              if (index !== -1) {
+                this.q.splice(index, 1);
+              }
+            };
+
+            this.empty = function() {
+              return !this.q.length;
+            };
+
             var i, j;
             this.call = function() {
                 for (i = 0, j = this.q.length; i < j; i++) {
@@ -70,30 +81,30 @@
             }
         }
 
+        function callEventQueue() {
+          element.resizedAttached.call();
+        }
+
         /**
          *
          * @param {HTMLElement} element
          * @param {Function}    resized
          */
         function attachResizeEvent(element, resized) {
-            if (!element.resizedAttached) {
-                element.resizedAttached = new EventQueue();
-                element.resizedAttached.add(resized);
-            } else if (element.resizedAttached) {
+            if (element.resizedAttached) {
                 element.resizedAttached.add(resized);
                 return;
             }
 
-            if ('onresize' in element && !(/Chrome/).test(navigator.userAgent)) {
+            element.resizedAttached = new EventQueue();
+            element.resizedAttached.add(resized);
+
+            if (hasNativeResizeEvent) {
                 //internet explorer
                 if (element.attachEvent) {
-                    element.attachEvent('onresize', function() {
-                        element.resizedAttached.call();
-                    });
+                    element.attachEvent('onresize', callEventQueue);
                 } else if (element.addEventListener) {
-                    element.addEventListener('resize', function(){
-                        element.resizedAttached.call();
-                    });
+                    element.addEventListener('resize', callEventQueue);
                 }
             } else {
                 var myResized = function() {
@@ -151,10 +162,35 @@
             }
         }
 
-        if ('array' === typeof element
+        function detachResizeEvent(element, resized) {
+          element.resizedAttached.remove(resized);
+          if (!element.resizedAttached.empty()) {
+            return;
+          }
+          
+          if (hasNativeResizeEvent) {
+            //internet explorer
+            if (element.detachEvent) {
+                element.detachEvent('onresize', callEventQueue);
+            } else if (element.removeEventListener) {
+                element.removeEventListener('resize', callEventQueue);
+            }
+          } else {
+            var parentNode = element.resizeSensor.parentNode;
+            if (parentNode) {
+              parentNode.removeChild(element.resizeSensor);
+            }
+          }
+          
+          delete element.resizedAttached;
+          delete element.resizeSensor;
+        }
+
+        var isCollection = 'array' === typeof element
             || ('undefined' !== typeof jQuery && element instanceof jQuery) //jquery
-            || ('undefined' !== typeof Elements && element instanceof Elements) //mootools
-            ) {
+            || ('undefined' !== typeof Elements && element instanceof Elements); //mootools
+
+        if (isCollection) {
             var i = 0, j = element.length;
             for (; i < j; i++) {
                 attachResizeEvent(element[i], callback);
@@ -162,6 +198,19 @@
         } else {
             attachResizeEvent(element, callback);
         }
+
+        return {
+            destroy: function() {
+              if (isCollection) {
+                  var i = 0, j = element.length;
+                  for (; i < j; i++) {
+                      detachResizeEvent(element[i], callback);
+                  }
+              } else {
+                  detachResizeEvent(element, callback);
+              }
+            }
+        };
     }
 
 })();
