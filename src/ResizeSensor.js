@@ -112,7 +112,9 @@
             reset();
 
             var changed = function() {
-                element.resizedAttached.call();
+                if (element.resizedAttached) {
+                    element.resizedAttached.call();
+                }
             };
 
             var addEvent = function(el, name, cb) {
